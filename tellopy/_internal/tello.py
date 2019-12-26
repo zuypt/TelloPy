@@ -18,7 +18,6 @@ from . import dispatcher
 
 log = logger.Logger('Tello')
 
-
 class Tello(object):
     EVENT_CONNECTED = event.Event('connected')
     EVENT_WIFI = event.Event('wifi')
@@ -60,7 +59,7 @@ class Tello(object):
     LOG_DEBUG = logger.LOG_DEBUG
     LOG_ALL = logger.LOG_ALL
 
-    def __init__(self, port=9000):
+    def __init__(self, port=9000, sockfd=None, no_video_thread=False, no_recv_thread=False):
         self.tello_addr = ('192.168.10.1', 8889)
         self.debug = False
         self.pkt_seq_num = 0x01e4
@@ -97,13 +96,18 @@ class Tello(object):
         self.file_recv = {}  # Map filenum -> protocol.DownloadedFile
 
         # Create a UDP socket
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind(('', self.port))
+        if not sockfd:
+          self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+          self.sock.bind(('', self.port))
+        else:
+          self.sock = socket.fromfd(sockfd, socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.settimeout(2.0)
-
+        
         dispatcher.connect(self.__state_machine, dispatcher.signal.All)
-        threading.Thread(target=self.__recv_thread).start()
-        threading.Thread(target=self.__video_thread).start()
+        if not no_recv_thread:
+          threading.Thread(target=self.__recv_thread).start()
+        if not no_video_thread:
+          threading.Thread(target=self.__video_thread).start()
 
     def set_loglevel(self, level):
         """
